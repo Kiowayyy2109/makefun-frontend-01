@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Lumen — a fast, read-only frontend for make.fun: live bounty board, bounty pages, leaderboards and public profiles.">
+<meta name="color-scheme" content="light">
+<title>Lumen — make.fun frontend</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="#/" aria-label="Lumen home">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-name">Lumen</span>
+      <span class="brand-sub">make.fun frontend</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#/" data-nav="board">Board</a>
+      <a href="#/bounty/makefun-frontend-01" data-nav="bounty">This bounty</a>
+      <a href="#/bounty/makefun-frontend-01/leaderboard" data-nav="leaderboard">Leaderboard</a>
+      <a href="#/profile/kiowayyy" data-nav="profile">Profile</a>
+    </nav>
+  </div>
+</header>
+<nav class="crumbs wrap" id="crumbs" aria-label="Breadcrumb"></nav>
+<main class="wrap" id="view" aria-live="polite"></main>
+<footer class="wrap foot">
+  <p>
+    <strong>Lumen</strong> reads only the public make.fun API
+    (<code>GET https://make.fun/api/…</code>) — no sign-in, no writes.
+    <span id="netstat" class="netstat">0 requests · 0 served from cache</span>
+  </p>
+  <p class="foot-note">Live pots, fees and deadlines come from make.fun as they
+  change. “Open” is judged by the deadline, not by the status text alone:
+  a bounty past its deadline takes no more entries.</p>
+</footer>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
