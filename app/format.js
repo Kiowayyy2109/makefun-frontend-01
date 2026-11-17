@@ -1,6 +1,6 @@
-// format.js — small, dependency-free formatting helpers for Lumen.
-// Money, dates, countdowns, numbers and a tiny Markdown renderer live here
-// so the views stay about layout and data, not string wrangling.
+// format.js — small dependency-free formatters for Lumen: money, dates,
+// live countdowns, numbers, HTML escaping and a tiny Markdown renderer,
+// kept here so the views stay about layout and data.
 
 const usd0 = new Intl.NumberFormat('en-US', {
   style: 'currency', currency: 'USD', maximumFractionDigits: 0,
@@ -13,26 +13,40 @@ const pctFmt = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
 
-/** Format a dollar amount; whole dollars get no cents, the rest get two. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Escape text for insertion into HTML. Never interpolate raw API text. */
+export function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[ch]);
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** "$733" for whole dollars, "$146.64" otherwise; "—" when not a number. */
 export function money(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return Number.isInteger(n) ? usd0.format(n) : usd2.format(n);
 }
 
-/** Format a dollar amount with exactly two decimals (reward tables). */
+/** "$146.64" always with two decimals (reward tables). */
 export function money2(value) {
   const n = Number(value);
   return Number.isFinite(n) ? usd2.format(n) : '—';
 }
 
-/** Format an integer count with thousands separators. */
+/** "1,234" with thousands separators. */
 export function count(value) {
   const n = Number(value);
   return Number.isFinite(n) ? intFmt.format(Math.round(n)) : '—';
 }
 
-/** Format a byte size as "660 KB" / "1.2 MB". */
+/** "660 B" / "12.4 KB" / "1.20 MB". */
 export function bytes(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
@@ -41,26 +55,19 @@ export function bytes(value) {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-/** Micro-units (1e-6) as a percentage with two decimals: 950587 -> "95.06%". */
+/** Micro-units (1e-6) as a percentage: 887766 -> "88.78%". */
 export function microPct(value) {
   const n = Number(value);
   return Number.isFinite(n) ? `${pctFmt.format(n / 10000)}%` : '—';
 }
 
-/** Micro-US-dollars as dollars: "7805060" -> "$7.81". */
+/** Micro-US-dollars as dollars: 7805060 -> "$7.81". */
 export function microUsd(value) {
   const n = Number(value);
   return Number.isFinite(n) ? money(n / 1e6) : '—';
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function pad2(n) {
-  return String(n).padStart(2, '0');
-}
-
-/** "17 Nov 2026, 12:30 UTC" — always UTC, so every reader sees the same time. */
+/** "17 Nov 2026, 12:30 UTC" — always UTC, so every reader sees one time. */
 export function dateTime(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
@@ -75,118 +82,120 @@ export function dateShort(iso) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/** "2h ago" / "in 3d" style relative time against a reference moment. */
+/**
+ * Relative time against a reference moment: "3h ago", "in 2d".
+ * Past dates get "ago"; future dates get "in …".
+ */
 export function timeAgo(iso, nowMs = Date.now()) {
   const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '—';
-  const diff = nowMs - then;
-  const abs = Math.abs(diff);
-  const unit = abs < 60_000 ? [Math.max(1, Math.round(abs / 1000)), 's']
-    : abs < 3_600_000 ? [Math.round(abs / 60_000), 'm']
-    : abs < 86_400_000 ? [Math.round(abs / 3_600_000), 'h']
-    : [Math.round(abs / 86_400_000), 'd'];
-  return diff >= 0 ? `${unit[0]}${unit[1]} ago` : `in ${unit[0]}${unit[1]}`;
+  if (Number.isNaN(then)) return '—';
+  let diff = Math.round((nowMs - then) / 1000);
+  const future = diff < 0;
+  diff = Math.abs(diff);
+  const unit = diff < 60 ? `${diff}s`
+    : diff < 3600 ? `${Math.floor(diff / 60)}m`
+    : diff < 86400 ? `${Math.floor(diff / 3600)}h`
+    : diff < 86400 * 30 ? `${Math.floor(diff / 86400)}d`
+    : `${Math.floor(diff / (86400 * 30))}mo`;
+  return future ? `in ${unit}` : `${unit} ago`;
 }
 
 /**
- * Split a deadline into a short countdown and whether it has passed.
- * Returns { text, past, ms } where text is like "2d 4h", "36m", "12s" or "Ended".
- * Kept in one place so the board, the bounty page and the ticker agree.
+ * Time left until a deadline: { text, past }.
+ * "2d 4h", "3h 12m", "45s", "ended". Ticks in place via boot.js.
  */
-export function countdown(deadlineIso, nowMs = Date.now()) {
-  const end = new Date(deadlineIso).getTime();
-  if (!Number.isFinite(end)) return { text: '—', past: false, ms: NaN };
-  const ms = end - nowMs;
-  if (ms <= 0) return { text: 'Ended', past: true, ms };
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  let text;
-  if (days > 0) text = `${days}d ${hours}h`;
-  else if (hours > 0) text = `${hours}h ${pad2(minutes)}m`;
-  else if (minutes > 0) text = `${minutes}m ${pad2(seconds)}s`;
-  else text = `${seconds}s`;
-  return { text, past: false, ms };
+export function countdown(iso, nowMs = Date.now()) {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return { text: '—', past: false };
+  const seconds = Math.floor((then - nowMs) / 1000);
+  if (seconds <= 0) return { text: 'ended', past: true };
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (days > 0) return { text: `${days}d ${hours}h`, past: false };
+  if (hours > 0) return { text: `${hours}h ${pad2(minutes)}m`, past: false };
+  if (minutes > 0) return { text: `${minutes}m ${pad2(secs)}s`, past: false };
+  return { text: `${secs}s`, past: false };
 }
 
-/** "Open now" / "Closing soon" / "Ended" — judged by the deadline, not status text. */
+/**
+ * Whether a bounty still takes entries, judged by its deadline —
+ * never by the status text alone, which can still read "open" after
+ * the deadline until results are published. Returns one of
+ * "open" (>24h left), "soon" (<24h left) or "ended", with a label.
+ */
 export function openState(item, nowMs = Date.now()) {
-  const end = new Date(item.deadline).getTime();
-  if (!Number.isFinite(end)) return { key: 'unknown', label: 'Unknown' };
-  if (end <= nowMs) return { key: 'ended', label: 'Ended' };
-  if (end - nowMs < 24 * 3600_000) return { key: 'soon', label: 'Closing soon' };
+  const then = new Date(item?.deadline).getTime();
+  if (Number.isNaN(then)) return { key: 'open', label: 'Open' };
+  if (then <= nowMs) return { key: 'ended', label: 'Ended' };
+  if (then - nowMs < 24 * 3600 * 1000) return { key: 'soon', label: 'Closing soon' };
   return { key: 'open', label: 'Open' };
 }
 
-/** Escape text for safe insertion into HTML. */
-export function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+/** Shorten a long address or id: "ByrP…ZkWwf". */
+export function shorten(value, head = 4, tail = 4) {
+  const s = String(value ?? '');
+  if (s.length <= head + tail + 1) return s;
+  return `${s.slice(0, head)}…${s.slice(-tail)}`;
 }
-
-/** Inline Markdown: bold, italic, code, links. Input must already be escaped. */
-function inlineMd(escaped) {
-  return escaped
-    .replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`)
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_m, text, href) =>
-      `<a href="${href}" target="_blank" rel="noopener">${text}</a>`)
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-}
-
-const HEADING = /^(#{1,4})\s+(.*)$/;
-const LIST_ITEM = /^[-*]\s+(.*)$/;
-const ORDERED_ITEM = /^\d+[.)]\s+(.*)$/;
 
 /**
- * A small Markdown renderer for bounty descriptions and rules.
- * Supports headings, paragraphs, bullet and numbered lists, bold, italic,
- * inline code, links and horizontal rules. Everything else is plain text.
- * Input is escaped before any markup is applied, so no raw HTML passes through.
+ * A deliberately tiny Markdown renderer for bounty descriptions:
+ * headings, bold, italic, inline code, links, lists, code fences and
+ * paragraphs. Anything it does not recognise is escaped plain text,
+ * so hostile markup in a description can never become live HTML.
  */
 export function mdLite(source) {
-  const lines = String(source ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = String(source || '').split('\n');
   const out = [];
-  let list = null; // 'ul' | 'ol' | null
-  const closeList = () => {
-    if (list) { out.push(`</${list}>`); list = null; }
-  };
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (line.trim() === '') { closeList(); continue; }
-    const heading = HEADING.exec(line);
-    if (heading) {
-      closeList();
-      const level = Math.min(heading[1].length + 1, 4);
-      out.push(`<h${level}>${inlineMd(esc(heading[2].trim()))}</h${level}>`);
-      continue;
-    }
-    if (/^---+$/.test(line.trim())) { closeList(); out.push('<hr>'); continue; }
-    const bullet = LIST_ITEM.exec(line);
-    const ordered = ORDERED_ITEM.exec(line);
-    if (bullet || ordered) {
-      const kind = bullet ? 'ul' : 'ol';
-      const text = (bullet || ordered)[1];
-      if (list !== kind) { closeList(); list = kind; out.push(`<${kind}>`); }
-      out.push(`<li>${inlineMd(esc(text.trim()))}</li>`);
-      continue;
-    }
-    closeList();
-    out.push(`<p>${inlineMd(esc(line.trim()))}</p>`);
+  let list = null;
+  let code = false;
+  let para = [];
+  function flushPara() {
+    if (para.length) out.push(`<p>${inline(para.join(' '))}</p>`);
+    para = [];
   }
-  closeList();
+  function flushList() {
+    if (list) out.push(`<ul>${list.map((li) => `<li>${inline(li)}</li>`).join('')}</ul>`);
+    list = null;
+  }
+  function inline(text) {
+    return esc(text)
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+      .replace(/\*\*([^*]+)\*\*/g, (_, b) => `<strong>${b}</strong>`)
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, (_, pre, i) => `${pre}<em>${i}</em>`)
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_, t, href) =>
+        `<a href="${href}" target="_blank" rel="noopener">${t}</a>`);
+  }
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (line.startsWith('```')) {
+      if (code) out.push('</code></pre>');
+      else { flushPara(); flushList(); out.push('<pre><code>'); }
+      code = !code;
+      continue;
+    }
+    if (code) { out.push(`${esc(line)}\n`); continue; }
+    const heading = line.match(/^(#{1,3})\s+(.*)$/);
+    if (heading) {
+      flushPara(); flushList();
+      const level = heading[1].length + 1;
+      out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+      continue;
+    }
+    const bullet = line.match(/^[-*]\s+(.*)$/);
+    if (bullet) {
+      flushPara();
+      if (!list) list = [];
+      list.push(bullet[1]);
+      continue;
+    }
+    if (line === '') { flushPara(); flushList(); continue; }
+    para.push(line);
+  }
+  flushPara();
+  flushList();
+  if (code) out.push('</code></pre>');
   return out.join('\n');
-}
-
-/** Shorten a long handle/wallet for narrow layouts, keeping both ends. */
-export function shorten(value, head = 8, tail = 6) {
-  const s = String(value ?? '');
-  if (s.length <= head + tail + 3) return s;
-  return `${s.slice(0, head)}…${s.slice(-tail)}`;
 }

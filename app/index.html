@@ -2,40 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Lumen — a fast, read-only frontend for make.fun: live bounty board, bounty pages, leaderboards and public profiles.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Lumen — a tiny, fast read-only frontend for make.fun: live bounty board beside each bounty, virtual leaderboards, public profiles.">
 <meta name="color-scheme" content="light">
 <title>Lumen — make.fun frontend</title>
-<link rel="stylesheet" href="./style.css">
+<style>html{color-scheme:light}body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#16202b;background:#f4f6f8}a{color:#0b5cad}.wrap{max-width:1240px;margin:0 auto;padding:0 14px}.topbar{background:#101c2b;color:#fff}.topbar-in{display:flex;gap:18px;align-items:center;min-height:52px}.brand{color:#fff;text-decoration:none;font-weight:800;font-size:18px;letter-spacing:.02em}.brand b{color:#7cc4ff}.topnav{display:flex;gap:2px;margin-left:auto}.topnav a{color:#cfe2f2;text-decoration:none;padding:7px 10px;border-radius:7px;font-size:14px}.topnav a[aria-current]{background:#1d3247;color:#fff}#view{min-height:70vh}.skel{color:#5a6b7a;padding:38px 0}.skel i{display:block;height:14px;border-radius:6px;background:#dde5ec;margin:10px 0;animation:p 1.1s infinite alternate}@keyframes p{to{opacity:.45}}.foot{color:#5a6b7a;font-size:13px;padding:22px 0 34px}.foot code{font-size:12px}</style>
 </head>
 <body>
-<header class="topbar">
-  <div class="wrap topbar-in">
-    <a class="brand" href="#/" aria-label="Lumen home">
-      <span class="brand-dot" aria-hidden="true"></span>
-      <span class="brand-name">Lumen</span>
-      <span class="brand-sub">make.fun frontend</span>
-    </a>
-    <nav class="topnav" aria-label="Main">
-      <a href="#/" data-nav="board">Board</a>
-      <a href="#/bounty/makefun-frontend-01" data-nav="bounty">This bounty</a>
-      <a href="#/bounty/makefun-frontend-01/leaderboard" data-nav="leaderboard">Leaderboard</a>
-      <a href="#/profile/kiowayyy" data-nav="profile">Profile</a>
-    </nav>
-  </div>
-</header>
+<header class="topbar"><div class="wrap topbar-in">
+<a class="brand" href="#/" aria-label="Lumen home">Lumen <b>· make.fun</b></a>
+<nav class="topnav" aria-label="Main">
+<a href="#/" data-nav="board">Board</a>
+<a href="#/bounty/makefun-frontend-01" data-nav="bounty">This bounty</a>
+<a href="#/bounty/makefun-frontend-01/leaderboard" data-nav="leaderboard">Leaderboard</a>
+<a href="#/profile/kiowayyy" data-nav="profile">Profile</a>
+</nav></div></header>
 <nav class="crumbs wrap" id="crumbs" aria-label="Breadcrumb"></nav>
-<main class="wrap" id="view" aria-live="polite"></main>
-<footer class="wrap foot">
-  <p>
-    <strong>Lumen</strong> reads only the public make.fun API
-    (<code>GET https://make.fun/api/…</code>) — no sign-in, no writes.
-    <span id="netstat" class="netstat">0 requests · 0 served from cache</span>
-  </p>
-  <p class="foot-note">Live pots, fees and deadlines come from make.fun as they
-  change. “Open” is judged by the deadline, not by the status text alone:
-  a bounty past its deadline takes no more entries.</p>
-</footer>
-<script type="module" src="./main.js"></script>
+<main class="wrap" id="view" aria-live="polite"><div class="skel" role="status">Loading live data from make.fun…<i style="width:62%"></i><i style="width:88%"></i><i style="width:41%"></i></div></main>
+<footer class="wrap foot"><p><strong>Lumen</strong> reads only the public make.fun API (<code>GET https://make.fun/api/…</code>) — no sign-in, no writes. <span id="netstat">0 requests · 0 from cache</span></p>
+<p>“Open” is judged by the deadline, not the status text alone: a bounty past its deadline takes no more entries. Pots, fees and deadlines are live from make.fun.</p></footer>
+<script type="module">import('./boot.js');</script>
 </body>
 </html>
